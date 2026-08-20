@@ -38,6 +38,7 @@
 #include "Prefs.h"
 #include "Session.h"
 #include "TorrentModel.h"
+#include "Utils.h"
 #include "WatchDir.h"
 
 namespace
@@ -562,11 +563,11 @@ void Application::onNotificationActionInvoked(quint32 /* notification_id */, QSt
 }
 #endif
 
-tr::interop::Reply Application::LocalInstance::present_window()
+tr::interop::Reply Application::LocalInstance::present_window(std::string_view const activation_token)
 {
     // Show and unminimize the window rather than just alert the user.
     // We took over another launch, and a launch that produces no window did nothing.
-    app_.window_->presentWindow();
+    app_.window_->presentWindow(Utils::toQString(activation_token));
     return tr::interop::Reply::Yes;
 }
 

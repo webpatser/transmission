@@ -155,8 +155,12 @@ public:
     {
     }
 
-    [[nodiscard]] tr::interop::Reply present_window() override
+    [[nodiscard]] tr::interop::Reply present_window(std::string_view const /*activation_token*/) override
     {
+        // Windows has no activation token. Its pass is a foreground right the caller
+        // transfers to the server, so the server's SetForegroundWindow succeeds instead
+        // of degrading to a taskbar flash.
+        grant_foreground();
         return call_reply(tr::interop::MethodPresentWindow);
     }
 
@@ -198,6 +202,24 @@ private:
         }
 
         return server_reachable() ? tr::interop::Reply::Unanswered : tr::interop::Reply::Gone;
+    }
+
+    // Best effort: the grant transfers a right this process must itself hold, and it
+    // fails on a same-apartment pointer, where there is no proxy. The present call is
+    // still worth making without it. The window then flashes rather than comes forward.
+    void grant_foreground()
+    {
+        auto* dispatch = static_cast<IDispatch*>(nullptr);
+        client_->queryInterface(
+            QUuid{ QStringLiteral("{00020400-0000-0000-C000-000000000046}") }, // IID_IDispatch
+            reinterpret_cast<void**>(&dispatch));
+        if (dispatch == nullptr)
+        {
+            return;
+        }
+
+        ::CoAllowSetForegroundWindow(dispatch, nullptr);
+        dispatch->Release();
     }
 
     // One cheap round trip to the server. Every IDispatch implements GetTypeInfoCount(),

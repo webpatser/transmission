@@ -56,6 +56,7 @@ struct Script
 
     int config_dir_asks = 0;
     int present_asks = 0;
+    std::string present_token;
     std::vector<std::string> adds;
 };
 
@@ -67,9 +68,10 @@ public:
     {
     }
 
-    [[nodiscard]] interop::Reply present_window() override
+    [[nodiscard]] interop::Reply present_window(std::string_view const activation_token) override
     {
         ++script_.present_asks;
+        script_.present_token = activation_token;
         return script_.present_answer;
     }
 
@@ -178,6 +180,17 @@ TEST_F(InteropTest, presentsTheInstanceServingTheConfigDir)
     EXPECT_EQ(1, script.present_asks);
     EXPECT_EQ(1, script.config_dir_asks);
     EXPECT_TRUE(std::empty(script.adds));
+}
+
+// The token is the caller's, and only the instance's compositor can spend it,
+// so it has to cross unaltered.
+TEST_F(InteropTest, presentCarriesTheActivationToken)
+{
+    auto script = Script{ sandboxDir() };
+    auto coordinator = make_coordinator(sandboxDir(), &script);
+
+    EXPECT_EQ(0, coordinator->delegate(Intent::Present, {}, "launch-token"));
+    EXPECT_EQ("launch-token", script.present_token);
 }
 
 TEST_F(InteropTest, handsTorrentsToTheInstanceServingTheConfigDir)
@@ -544,7 +557,7 @@ TEST_F(InteropTest, contendedLaunchWaitsOutThePublisherThenDelegates)
     auto exit_code = std::optional<int>{};
     auto launcher = std::thread{ [&]
                                  {
-                                     exit_code = launcher_coordinator->delegate(Intent::Present, {}, 5s);
+                                     exit_code = launcher_coordinator->delegate(Intent::Present, {}, {}, 5s);
                                  } };
 
     // The publisher publishes, then releases the startup lock. The launcher's final
@@ -566,7 +579,7 @@ TEST_F(InteropTest, busyWhenThePublisherNeverYields)
     auto publisher = make_coordinator(sandboxDir());
     auto launcher = make_coordinator(sandboxDir());
 
-    EXPECT_EQ(1, launcher->delegate(Intent::Present, {}, 200ms));
+    EXPECT_EQ(1, launcher->delegate(Intent::Present, {}, {}, 200ms));
 }
 
 // A refused handoff must not read as success anywhere between the delegation and the exit code.

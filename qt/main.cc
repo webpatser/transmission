@@ -206,7 +206,10 @@ int tr_main(int argc, char** argv)
 
     auto const intent = intentOf(standalone, !filenames.isEmpty());
 
-    if (auto const exit_code = startup_coordinator->delegate(intent, [&filenames] { return delegatableMetainfos(filenames); });
+    if (auto const exit_code = startup_coordinator->delegate(
+            intent,
+            [&filenames] { return delegatableMetainfos(filenames); },
+            tr::interop::activation_token());
         exit_code)
     {
         return *exit_code;

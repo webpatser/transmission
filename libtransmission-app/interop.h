@@ -51,7 +51,11 @@ public:
 
     // Gone requires proof from the transport that the instance's process has exited.
     // Silence without that proof is Unanswered.
-    [[nodiscard]] virtual Reply present_window() = 0;
+    //
+    // `activation_token` lets focus follow the caller's launch to this instance's
+    // window; see activation_token() below. Empty when the caller has none, and the
+    // instance then presents as well as its platform allows without one.
+    [[nodiscard]] virtual Reply present_window(std::string_view activation_token) = 0;
     [[nodiscard]] virtual Reply add_metainfo(std::string_view metainfo) = 0;
 
     // The canonical config dir this instance answers for, canonical as interop-names.h
@@ -97,6 +101,12 @@ public:
 // This canonicalizes `config_dir` itself rather than trust the caller to have done it.
 // Declared here rather than in the Windows code so that every platform can test it.
 [[nodiscard]] std::string com_config_moniker_item(std::string_view config_dir);
+
+// The single-use pass the desktop put in this launch's environment so that focus may
+// follow the launch to whichever window ends up presenting. Wayland spells it
+// XDG_ACTIVATION_TOKEN; X11's DESKTOP_STARTUP_ID is the same idea. Empty when the
+// desktop gave none, a launch from a terminal most often.
+[[nodiscard]] std::string activation_token();
 
 // Returns true if `arg` is a URL or a magnet link.
 // Returns false if `arg` is a base64-encoded .torrent.

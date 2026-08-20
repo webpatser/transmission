@@ -34,7 +34,12 @@ InteropObject::InteropObject(tr::interop::Instance& instance, QObject* const par
 
 bool InteropObject::PresentWindow() const
 {
-    return instance_ != nullptr && instance_->present_window() == tr::interop::Reply::Yes;
+    return instance_ != nullptr && instance_->present_window({}) == tr::interop::Reply::Yes;
+}
+
+bool InteropObject::PresentWindowWithToken(QString const& activation_token) const
+{
+    return instance_ != nullptr && instance_->present_window(activation_token.toStdString()) == tr::interop::Reply::Yes;
 }
 
 bool InteropObject::AddMetainfo(QString const& metainfo) const

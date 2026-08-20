@@ -122,7 +122,7 @@ private:
         {
         }
 
-        [[nodiscard]] tr::interop::Reply present_window() override;
+        [[nodiscard]] tr::interop::Reply present_window(std::string_view activation_token) override;
         [[nodiscard]] tr::interop::Reply add_metainfo(std::string_view metainfo) override;
         [[nodiscard]] std::string config_dir() override;
         [[nodiscard]] std::string description() const override;

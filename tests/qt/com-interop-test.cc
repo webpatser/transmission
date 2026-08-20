@@ -35,7 +35,7 @@ public:
     {
     }
 
-    [[nodiscard]] tr::interop::Reply present_window() override
+    [[nodiscard]] tr::interop::Reply present_window(std::string_view const /*activation_token*/) override
     {
         return tr::interop::Reply::Yes;
     }
@@ -102,7 +102,7 @@ private slots:
         auto first = tr::interop::make_transport(QStringLiteral("C:/one"))->find_other_instance();
         QVERIFY(first != nullptr);
         QCOMPARE(first->config_dir(), std::string{ "C:/one" });
-        QVERIFY(first->present_window() == tr::interop::Reply::Yes);
+        QVERIFY(first->present_window({}) == tr::interop::Reply::Yes);
         QVERIFY(first->add_metainfo("alpha") == tr::interop::Reply::Yes);
 
         auto second = tr::interop::make_transport(QStringLiteral("C:/two"))->find_other_instance();

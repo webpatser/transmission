@@ -68,8 +68,23 @@ public:
     {
     }
 
-    [[nodiscard]] tr::interop::Reply present_window() override
+    [[nodiscard]] tr::interop::Reply present_window(std::string_view const activation_token) override
     {
+        // Offer the token first: the peer's compositor needs it before it will hand
+        // focus over. Only silence sends us to the tokenless fallback, so a client from
+        // before PresentWindowWithToken still presents, at the price of one unanswered
+        // call, and a wedged client costs one extra timeout.
+        if (!std::empty(activation_token))
+        {
+            auto const reply = call_reply(
+                tr::interop::MethodPresentWindowWithToken,
+                QVariantList{} << Utils::toQString(activation_token));
+            if (reply != tr::interop::Reply::Unanswered)
+            {
+                return reply;
+            }
+        }
+
         return call_reply(tr::interop::MethodPresentWindow);
     }
 

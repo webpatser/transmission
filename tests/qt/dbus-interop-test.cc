@@ -60,12 +60,23 @@ public:
         return received_;
     }
 
+    void record(QString const& call)
+    {
+        auto const lock = QMutexLocker{ &mutex_ };
+        received_.append(call);
+    }
+
 public slots:
     // NOLINTBEGIN(readability-identifier-naming)
     bool AddMetainfo(QString const& metainfo)
     {
-        auto const lock = QMutexLocker{ &mutex_ };
-        received_.append(metainfo);
+        record(metainfo);
+        return true;
+    }
+
+    bool PresentWindow()
+    {
+        record(QStringLiteral("PresentWindow"));
         return true;
     }
     // NOLINTEND(readability-identifier-naming)
@@ -101,6 +112,12 @@ public slots:
     [[nodiscard]] QString ConfigDir() const
     {
         return config_dir_;
+    }
+
+    bool PresentWindowWithToken(QString const& activation_token)
+    {
+        record(QStringLiteral("PresentWindowWithToken ") + activation_token);
+        return true;
     }
     // NOLINTEND(readability-identifier-naming)
 
@@ -191,9 +208,10 @@ public:
     {
     }
 
-    [[nodiscard]] tr::interop::Reply present_window() override
+    [[nodiscard]] tr::interop::Reply present_window(std::string_view const activation_token) override
     {
         ++presents;
+        present_token = activation_token;
         called_on = QThread::currentThread();
         return tr::interop::Reply::Yes;
     }
@@ -217,6 +235,7 @@ public:
     }
 
     int presents = 0;
+    std::string present_token;
     std::vector<std::string> adds;
     QThread* called_on = nullptr;
 
@@ -446,6 +465,35 @@ private slots:
         QVERIFY(transport->find_other_instance() == nullptr);
     }
 
+    // The token is the caller's pass for handing focus over; only the client's
+    // compositor can spend it, so it has to arrive unaltered.
+    static void hands_the_activation_token_to_a_client_that_takes_one()
+    {
+        auto const dir = QTemporaryDir{};
+        auto client = FakeClient{ dir.path() };
+        auto const thread = ClientThread{ QStringLiteral("token-taker"), &client, false };
+        claimConfigDir(dir.path(), thread.uniqueName());
+
+        auto const instance = tr::interop::make_transport(dir.path())->find_other_instance();
+        QVERIFY(instance != nullptr);
+        QVERIFY(instance->present_window("launch-token") == tr::interop::Reply::Yes);
+        QCOMPARE(client.received(), QStringList{ QStringLiteral("PresentWindowWithToken launch-token") });
+    }
+
+    // A release predating PresentWindowWithToken still presents; the token is what a
+    // caller gives up, not the presenting.
+    static void falls_back_to_plain_present_for_a_client_without_the_token_method()
+    {
+        auto const dir = QTemporaryDir{};
+        auto client = UnplaceableFakeClient{};
+        auto const thread = ClientThread{ QStringLiteral("token-less"), &client, true };
+
+        auto const instance = tr::interop::make_transport(dir.path())->find_other_instance();
+        QVERIFY(instance != nullptr);
+        QVERIFY(instance->present_window("launch-token") == tr::interop::Reply::Yes);
+        QCOMPARE(client.received(), QStringList{ QStringLiteral("PresentWindow") });
+    }
+
     // The peer's death has to be told apart from its silence. A launch mid-handoff
     // starts over a dead peer, but must not start over one that merely stopped
     // answering, whose session still holds the config dir.
@@ -589,6 +637,44 @@ private slots:
 
         // InteropObject.h promises the call arrives on the GUI thread, where the window lives.
         QCOMPARE(instance.called_on, QThread::currentThread());
+
+        QVERIFY(QDBusConnection::sessionBus().unregisterService(ServiceName));
+    }
+
+    // The other end of hands_the_activation_token_to_a_client_that_takes_one():
+    // a caller's token reaches the published Instance intact.
+    static void a_published_client_receives_the_callers_token()
+    {
+        auto const dir = QTemporaryDir{};
+        auto instance = RecordingInstance{ dir.path().toStdString() };
+        auto transport = tr::interop::make_transport(dir.path());
+        transport->publish(instance);
+
+        auto answered = std::atomic<bool>{ false };
+        auto accepted = std::atomic<bool>{ false };
+        auto caller = std::thread{ [&answered, &accepted]()
+                                   {
+                                       auto const name = QStringLiteral("token-caller");
+                                       auto bus = QDBusConnection::connectToBus(QDBusConnection::SessionBus, name);
+                                       auto request = QDBusMessage::createMethodCall(
+                                           ServiceName,
+                                           ObjectPath,
+                                           InterfaceName,
+                                           QStringLiteral(TR_INTEROP_METHOD_PRESENT_WINDOW_WITH_TOKEN));
+                                       request.setArguments(QVariantList{} << QStringLiteral("published-token"));
+                                       accepted = QDBusReply<bool>{ bus.call(request) }.value();
+                                       answered = true;
+                                       QDBusConnection::disconnectFromBus(name);
+                                   } };
+
+        // Join before the first verify, as in the record-caller case above.
+        auto const answered_in_time = QTest::qWaitFor([&answered]() { return answered.load(); }, 5000);
+        caller.join();
+        QVERIFY(answered_in_time);
+
+        QVERIFY(accepted.load());
+        QCOMPARE(instance.presents, 1);
+        QCOMPARE(QString::fromStdString(instance.present_token), QStringLiteral("published-token"));
 
         QVERIFY(QDBusConnection::sessionBus().unregisterService(ServiceName));
     }

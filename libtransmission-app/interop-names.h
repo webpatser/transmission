@@ -37,6 +37,7 @@
 
 #define TR_INTEROP_METHOD_ADD_METAINFO "AddMetainfo"
 #define TR_INTEROP_METHOD_PRESENT_WINDOW "PresentWindow"
+#define TR_INTEROP_METHOD_PRESENT_WINDOW_WITH_TOKEN "PresentWindowWithToken"
 #define TR_INTEROP_METHOD_CONFIG_DIR "ConfigDir"
 
 namespace tr::interop
@@ -50,6 +51,8 @@ inline constexpr std::string_view DBusIntrospectionXml =
     "'><arg type='s' direction='in'/><arg type='b' direction='out'/></method>"
     "<method name='" TR_INTEROP_METHOD_PRESENT_WINDOW
     "'><arg type='b' direction='out'/></method>"
+    "<method name='" TR_INTEROP_METHOD_PRESENT_WINDOW_WITH_TOKEN
+    "'><arg type='s' direction='in'/><arg type='b' direction='out'/></method>"
     "<method name='" TR_INTEROP_METHOD_CONFIG_DIR
     "'><arg type='s' direction='out'/></method>"
     "</interface>"
@@ -61,14 +64,20 @@ inline constexpr std::string_view DBusIntrospectionXml =
 inline constexpr std::string_view ComConfigMonikerPrefix = "Transmission.ConfigDir:";
 
 // Names and signatures are both part of the contract. In D-Bus notation:
-//   AddMetainfo(s) -> b   PresentWindow() -> b   ConfigDir() -> s
+//   AddMetainfo(s) -> b   PresentWindow() -> b
+//   PresentWindowWithToken(s) -> b   ConfigDir() -> s
 //
 // - AddMetainfo's string carries a URL or magnet link as itself,
 //   or a torrent file's contents base64'd.
 // - PresentWindow is called by third-party scripts, so its name cannot change.
+// - PresentWindowWithToken's string carries the caller's activation token, the pass a
+//   desktop hands a launch so that focus may follow it to another window. A caller with
+//   a token offers this method first and falls back to PresentWindow when it goes
+//   unanswered, so a client without the method still presents, just without focus.
 // - ConfigDir must answer with the canonical config dir, defined below.
 inline constexpr std::string_view MethodAddMetainfo = TR_INTEROP_METHOD_ADD_METAINFO;
 inline constexpr std::string_view MethodPresentWindow = TR_INTEROP_METHOD_PRESENT_WINDOW;
+inline constexpr std::string_view MethodPresentWindowWithToken = TR_INTEROP_METHOD_PRESENT_WINDOW_WITH_TOKEN;
 inline constexpr std::string_view MethodConfigDir = TR_INTEROP_METHOD_CONFIG_DIR;
 
 // The canonical config dir

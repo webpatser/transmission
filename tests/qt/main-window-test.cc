@@ -23,6 +23,7 @@ class MainWindowTest : public QObject
 private slots:
     void presentsAWindowThatStartedInTheTray();
     void presentsAWindowThatIsAlreadyShowing();
+    void placesTheActivationTokenWhereTheWaylandBackendLooks();
 
 private:
     // Built per test so neither one inherits the other's window state.
@@ -76,6 +77,27 @@ void MainWindowTest::presentsAWindowThatIsAlreadyShowing()
     client->window.presentWindow();
     QVERIFY(client->window.isVisible());
     QVERIFY(!client->window.isMinimized());
+}
+
+// The Wayland backend takes the token from this environment variable during
+// activateWindow() and clears it. The offscreen platform consumes nothing, which is
+// what lets this test observe the value in place.
+void MainWindowTest::placesTheActivationTokenWhereTheWaylandBackendLooks()
+{
+    auto dir = QTemporaryDir{};
+    QVERIFY(dir.isValid());
+
+    auto client = std::make_unique<Client>(dir.path());
+
+    qunsetenv("XDG_ACTIVATION_TOKEN");
+    client->window.presentWindow(QStringLiteral("launch-token"));
+    QCOMPARE(qgetenv("XDG_ACTIVATION_TOKEN"), QByteArray{ "launch-token" });
+
+    // A token is single-use. presentWindow() must not plant one it was not given,
+    // where the next activation would spend it a second time.
+    qunsetenv("XDG_ACTIVATION_TOKEN");
+    client->window.presentWindow();
+    QCOMPARE(qgetenv("XDG_ACTIVATION_TOKEN"), QByteArray{});
 }
 
 QTEST_MAIN(MainWindowTest)

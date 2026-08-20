@@ -64,6 +64,37 @@ Glib::OptionEntry create_option_entry(Glib::ustring const& long_name, gchar shor
     return have_torrents ? tr::interop::Intent::AddTorrents : tr::interop::Intent::Present;
 }
 
+// The desktop's activation token, from wherever this toolkit left it.
+//
+// GTK4 moves the token out of the environment before main() runs, into a stash of
+// GDK's, so tr::interop::activation_token() comes back empty there. The stash has no
+// public getter, but GApplicationClass.add_platform_data is public, and GTK's override
+// fills the platform data a remote GtkApplication would send from exactly that stash.
+// Build that data on a throwaway application and read the token back out.
+// GTK3 leaves the environment alone this early, so the environment answers there.
+[[nodiscard]] std::string activation_token_of_this_launch()
+{
+    if (auto token = tr::interop::activation_token(); !std::empty(token))
+    {
+        return token;
+    }
+
+    auto* const app = G_APPLICATION(g_object_new(GTK_TYPE_APPLICATION, "flags", G_APPLICATION_NON_UNIQUE, nullptr));
+
+    GVariantBuilder builder;
+    g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
+    G_APPLICATION_GET_CLASS(app)->add_platform_data(app, &builder);
+    auto* const data = g_variant_builder_end(&builder);
+
+    char const* token = nullptr;
+    g_variant_lookup(data, "activation-token", "&s", &token);
+    auto ret = std::string{ token != nullptr ? token : "" };
+
+    g_variant_unref(data);
+    g_object_unref(app);
+    return ret;
+}
+
 // Arguments in AddMetainfo(s) wire form; see tr::interop::encode_metainfo_arg().
 [[nodiscard]] std::vector<std::string> delegatable_metainfos(int const argc, char** const argv)
 {
@@ -193,7 +224,8 @@ int main(int argc, char** argv)
 
     if (auto const exit_code = startup_coordinator->delegate(
             intent,
-            [argc, argv] { return delegatable_metainfos(argc, argv); });
+            [argc, argv] { return delegatable_metainfos(argc, argv); },
+            activation_token_of_this_launch());
         exit_code)
     {
         return *exit_code;

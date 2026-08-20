@@ -64,7 +64,8 @@ enum class StartupDecision : uint8_t
     Transport& transport,
     std::string_view const config_dir,
     Intent const intent,
-    MetainfoProvider const& metainfos)
+    MetainfoProvider const& metainfos,
+    std::string_view const activation_token)
 {
     if (intent == Intent::Standalone)
     {
@@ -142,7 +143,7 @@ enum class StartupDecision : uint8_t
         }
 
     case Intent::Present:
-        switch (other->present_window())
+        switch (other->present_window(activation_token))
         {
         case Reply::Yes:
             return StartupDecision::Delegated;
@@ -228,13 +229,14 @@ public:
     [[nodiscard]] StartupDecision arbitrate(
         Intent const intent,
         MetainfoProvider const& metainfos,
+        std::string_view const activation_token,
         std::chrono::milliseconds const patience)
     {
         using namespace std::chrono_literals;
 
         auto const delegate = [&]
         {
-            return try_delegate(*transport_, config_dir_, intent, metainfos);
+            return try_delegate(*transport_, config_dir_, intent, metainfos, activation_token);
         };
 
         if (auto const decision = delegate(); decision != StartupDecision::Start)
@@ -268,9 +270,10 @@ public:
     [[nodiscard]] std::optional<int> delegate(
         Intent const intent,
         MetainfoProvider const& metainfos,
+        std::string_view const activation_token,
         std::chrono::milliseconds const patience)
     {
-        return report_startup_decision(arbitrate(intent, metainfos, patience), intent, config_dir_);
+        return report_startup_decision(arbitrate(intent, metainfos, activation_token, patience), intent, config_dir_);
     }
 
     void publish(Instance& self)
@@ -295,9 +298,10 @@ StartupCoordinator::~StartupCoordinator() = default;
 std::optional<int> StartupCoordinator::delegate(
     Intent const intent,
     MetainfoProvider const& metainfos,
+    std::string_view const activation_token,
     std::chrono::milliseconds const patience)
 {
-    return impl_->delegate(intent, metainfos, patience);
+    return impl_->delegate(intent, metainfos, activation_token, patience);
 }
 
 int report_config_dir_busy(std::string_view const config_dir)

@@ -58,6 +58,7 @@ printf 'torrent-file-payload' > "$torrent"
 failures=0
 log=''
 config_args=()
+round_mode=''
 
 # Only one process can own a given bus name, so each round gets the mock to
 # itself, claiming that round's config dir.
@@ -183,11 +184,20 @@ run_launcher_cases() {
         failures=$((failures + 1))
     fi
 
-    # A bare launch presents the running instance and says so.
+    # A bare launch presents the running instance and says so. The desktop's
+    # activation token must ride along, spelled exactly as the environment gave it,
+    # so the instance's compositor can hand it focus. A release predating the token
+    # method still gets the tokenless call.
     local stderr_out
-    call="PresentWindow"
+    call="PresentWindowWithToken activation-token-$3"
+    if [ "$round_mode" = "--legacy" ]; then
+        call="PresentWindow"
+    fi
     before="$(call_count "$call")"
-    stderr_out="$(launch "$bin" 2>&1 > /dev/null)"
+    stderr_out="$(
+        export XDG_ACTIVATION_TOKEN="activation-token-$3"
+        launch "$bin" 2>&1 > /dev/null
+    )"
     rc=$?
     [ "$rc" -eq 0 ] || {
         echo "FAIL: $label bare launch exited $rc"
@@ -214,6 +224,7 @@ run_round() {
     local dir="$3"
     shift 3
     config_args=("$@")
+    round_mode="$mode"
 
     mkdir -p "$dir"
     start_mock "$mode" "$dir" "$workdir/calls-$round.log"

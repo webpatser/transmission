@@ -52,6 +52,19 @@ std::string com_config_moniker_item(std::string_view const config_dir)
     return std::string{ ComConfigMonikerPrefix } + canonical_config_dir(config_dir);
 }
 
+std::string activation_token()
+{
+    for (auto const* const key : { "XDG_ACTIVATION_TOKEN", "DESKTOP_STARTUP_ID" })
+    {
+        if (auto token = tr_env_get_string(key); !std::empty(token))
+        {
+            return token;
+        }
+    }
+
+    return {};
+}
+
 bool is_metainfo_link(std::string_view const arg)
 {
     return tr_urlIsValid(arg) || tr_magnet_metainfo{}.parseMagnet(arg);

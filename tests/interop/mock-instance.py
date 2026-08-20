@@ -20,10 +20,10 @@ Two ways to be reachable, matching the two a client has:
                 dir's peer record. This is how a launcher reaches a
                 separately-built client that shares no D-Bus name with
                 Transmission, so it must honour all three.
-  --legacy      own the shared bus name like --well-known, but answer no
-                ConfigDir method at all, the way a release older than the
-                method does. A launcher must treat the missing answer as
-                "too old to say" and hand off anyway.
+  --legacy      own the shared bus name like --well-known, but answer
+                neither ConfigDir nor PresentWindowWithToken, the way a
+                release older than both methods does. A launcher must treat
+                the missing answers as "too old" and hand off anyway.
 
 The shared wire names come from the environment, which CMake fills from
 interop-names.h, so this stays a client of the same contract the real ones
@@ -53,6 +53,7 @@ INTERFACE_NAME = wire_name("TR_INTEROP_INTERFACE_NAME")
 OBJECT_PATH = wire_name("TR_INTEROP_OBJECT_PATH")
 ADD_METAINFO = wire_name("TR_INTEROP_METHOD_ADD_METAINFO")
 PRESENT_WINDOW = wire_name("TR_INTEROP_METHOD_PRESENT_WINDOW")
+PRESENT_WINDOW_WITH_TOKEN = wire_name("TR_INTEROP_METHOD_PRESENT_WINDOW_WITH_TOKEN")
 CONFIG_DIR = wire_name("TR_INTEROP_METHOD_CONFIG_DIR")
 PEER_RECORD_FILENAME = wire_name("TR_INTEROP_PEER_RECORD_FILENAME")
 
@@ -63,10 +64,15 @@ FOREIGN_INTERFACE_NAME = "org.example.OtherClient"
 FOREIGN_OBJECT_PATH = "/org/example/OtherClient"
 
 
-def introspection_xml(interface: str, has_config_dir: bool) -> str:
-    """GDBus rejects calls to methods missing from this, so leaving ConfigDir out
-    makes the mock answer exactly as a release predating the method does."""
-    config_dir = f"<method name='{CONFIG_DIR}'><arg type='s' direction='out'/></method>" if has_config_dir else ""
+def introspection_xml(interface: str, modern: bool) -> str:
+    """GDBus rejects calls to methods missing from this, so leaving out ConfigDir and
+    PresentWindowWithToken makes the mock answer exactly as a release predating both
+    methods does."""
+    modern_methods = (
+        f"<method name='{CONFIG_DIR}'><arg type='s' direction='out'/></method>"
+        f"<method name='{PRESENT_WINDOW_WITH_TOKEN}'>"
+        f"<arg type='s' direction='in'/><arg type='b' direction='out'/></method>"
+    ) if modern else ""
     return f"""
 <node>
   <interface name='{interface}'>
@@ -74,7 +80,7 @@ def introspection_xml(interface: str, has_config_dir: bool) -> str:
       <arg type='s' direction='in'/><arg type='b' direction='out'/>
     </method>
     <method name='{PRESENT_WINDOW}'><arg type='b' direction='out'/></method>
-    {config_dir}
+    {modern_methods}
   </interface>
 </node>
 """
@@ -107,10 +113,13 @@ def main() -> None:
         elif method == PRESENT_WINDOW:
             log(PRESENT_WINDOW)
             invocation.return_value(GLib.Variant("(b)", (True,)))
+        elif method == PRESENT_WINDOW_WITH_TOKEN:
+            log(f"{PRESENT_WINDOW_WITH_TOKEN} " + params.unpack()[0])
+            invocation.return_value(GLib.Variant("(b)", (True,)))
         elif method == CONFIG_DIR:
             invocation.return_value(GLib.Variant("(s)", (config_dir,)))
 
-    node = Gio.DBusNodeInfo.new_for_xml(introspection_xml(interface, has_config_dir=not legacy))
+    node = Gio.DBusNodeInfo.new_for_xml(introspection_xml(interface, modern=not legacy))
     conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     conn.register_object(path, node.interfaces[0], on_call, None, None)
 

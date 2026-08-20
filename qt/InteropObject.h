@@ -57,6 +57,11 @@ public:
 public slots:
     // NOLINTBEGIN(readability-identifier-naming)
     [[nodiscard]] bool PresentWindow() const;
+
+    // PresentWindow plus the caller's activation token, so focus can follow the
+    // caller's launch to this window. See interop-names.h for when a caller uses which.
+    [[nodiscard]] bool PresentWindowWithToken(QString const& activation_token) const;
+
     [[nodiscard]] bool AddMetainfo(QString const& metainfo) const;
 
     // Return the canonical absolute path of this client's config directory.

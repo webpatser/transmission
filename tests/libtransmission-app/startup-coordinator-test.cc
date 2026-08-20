@@ -31,7 +31,7 @@ using interop::StartupLockFilename;
 class NullInstance final : public interop::Instance
 {
 public:
-    [[nodiscard]] interop::Reply present_window() override
+    [[nodiscard]] interop::Reply present_window(std::string_view const /*activation_token*/) override
     {
         return interop::Reply::Yes;
     }

@@ -38,9 +38,11 @@ public:
 
     // Returns an exit code when another instance took the launch or startup
     // timed out. Empty means this process should continue starting.
+    // `activation_token` rides along on a Present handoff; see interop.h.
     [[nodiscard]] std::optional<int> delegate(
         Intent intent,
         MetainfoProvider const& metainfos,
+        std::string_view activation_token = {},
         std::chrono::milliseconds patience = std::chrono::minutes{ 2 });
 
     // Makes `self` reachable before we release the startup lock.

@@ -181,8 +181,23 @@ public:
     {
     }
 
-    [[nodiscard]] tr::interop::Reply present_window() override
+    [[nodiscard]] tr::interop::Reply present_window(std::string_view const activation_token) override
     {
+        // Offer the token first: the peer's compositor needs it before it will hand
+        // focus over. Only silence sends us to the tokenless fallback, so a client from
+        // before PresentWindowWithToken still presents, at the price of one unanswered
+        // call, and a wedged client costs one extra timeout.
+        if (!std::empty(activation_token))
+        {
+            auto const reply = call_reply(
+                tr::interop::MethodPresentWindowWithToken,
+                gtr_variant_tuple(to_ustring(activation_token)));
+            if (reply != tr::interop::Reply::Unanswered)
+            {
+                return reply;
+            }
+        }
+
         return call_reply(tr::interop::MethodPresentWindow, {});
     }
 
@@ -295,7 +310,13 @@ void DBusTransport::on_method_call(
 
     if (method_name == to_ustring(tr::interop::MethodPresentWindow))
     {
-        reply_bool(published_ != nullptr && published_->present_window() == tr::interop::Reply::Yes);
+        reply_bool(published_ != nullptr && published_->present_window({}) == tr::interop::Reply::Yes);
+    }
+    else if (method_name == to_ustring(tr::interop::MethodPresentWindowWithToken))
+    {
+        auto token = Glib::Variant<Glib::ustring>{};
+        parameters.get_child(token, 0U);
+        reply_bool(published_ != nullptr && published_->present_window(token.get().raw()) == tr::interop::Reply::Yes);
     }
     else if (method_name == to_ustring(tr::interop::MethodAddMetainfo))
     {

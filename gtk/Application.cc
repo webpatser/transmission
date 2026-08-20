@@ -178,7 +178,7 @@ private:
         {
         }
 
-        [[nodiscard]] tr::interop::Reply present_window() override;
+        [[nodiscard]] tr::interop::Reply present_window(std::string_view activation_token) override;
         [[nodiscard]] tr::interop::Reply add_metainfo(std::string_view metainfo) override;
         [[nodiscard]] std::string config_dir() override;
         [[nodiscard]] std::string description() const override;
@@ -212,7 +212,7 @@ private:
     bool on_rpc_changed_idle(tr_rpc_callback_type type, tr_torrent_id_t torrent_id);
 
     void placeWindowFromPrefs();
-    void presentMainWindow();
+    void presentMainWindow(Glib::ustring const& activation_token = {});
     void hideMainWindow();
     void toggleMainWindow();
 
@@ -846,8 +846,16 @@ void Application::Impl::placeWindowFromPrefs()
 #endif
 }
 
-void Application::Impl::presentMainWindow()
+void Application::Impl::presentMainWindow(Glib::ustring const& activation_token)
 {
+    if (!activation_token.empty())
+    {
+        // GTK spends the token when it presents: startup-notification id on X11,
+        // xdg-activation token on Wayland. Without one the compositor may leave the
+        // window unfocused.
+        wind_->set_startup_id(activation_token);
+    }
+
     gtr_action_set_toggled("toggle-main-window", true);
 
     if (is_iconified_)
@@ -1708,7 +1716,7 @@ void Application::Impl::actions_handler(Glib::ustring const& action_name)
     }
 }
 
-tr::interop::Reply Application::Impl::LocalInstance::present_window()
+tr::interop::Reply Application::Impl::LocalInstance::present_window(std::string_view const activation_token)
 {
     // The transport answers until the main loop stops, which outlasts the window.
     // A client on its way out has one only until its session has finished closing.
@@ -1717,7 +1725,7 @@ tr::interop::Reply Application::Impl::LocalInstance::present_window()
         return tr::interop::Reply::No;
     }
 
-    impl_.presentMainWindow();
+    impl_.presentMainWindow(Glib::ustring{ std::string{ activation_token } });
     return tr::interop::Reply::Yes;
 }
 

@@ -62,7 +62,9 @@ public:
     }
 
     // Bring the window up from wherever it is: hidden to the tray, minimized, or behind another.
-    void presentWindow();
+    // `activation_token` is the caller's pass for taking focus; without one the
+    // compositor may leave the window unfocused. See tr::interop::activation_token().
+    void presentWindow(QString const& activation_token = {});
 
 public slots:
     void startAll();
