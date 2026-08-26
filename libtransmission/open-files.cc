@@ -143,7 +143,8 @@ std::optional<tr_sys_file_t> tr_open_files::get(
     bool writable,
     std::string_view filename_in,
     Preallocation allocation,
-    uint64_t file_size)
+    uint64_t file_size,
+    tr_error* out_error)
 {
     // is there already an entry
     auto key = make_key(tor_id, file_num);
@@ -172,6 +173,10 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                     fmt::arg("path", dir),
                     fmt::arg("error", error.message()),
                     fmt::arg("error_code", error.code())));
+            if (out_error != nullptr)
+            {
+                *out_error = std::move(error);
+            }
             return {};
         }
     }
@@ -195,6 +200,10 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                 fmt::arg("path", filename),
                 fmt::arg("error", error.message()),
                 fmt::arg("error_code", error.code())));
+        if (out_error != nullptr)
+        {
+            *out_error = std::move(error);
+        }
         return {};
     }
 
@@ -225,6 +234,10 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                     fmt::arg("error", error.message()),
                     fmt::arg("error_code", error.code())));
             tr_sys_file_close(fd);
+            if (out_error != nullptr)
+            {
+                *out_error = std::move(error);
+            }
             return {};
         }
 
@@ -238,13 +251,17 @@ std::optional<tr_sys_file_t> tr_open_files::get(
     // https://bugs.launchpad.net/ubuntu/+source/transmission/+bug/318249
     if (resize_needed && !tr_sys_file_truncate(fd, file_size, &error))
     {
-        tr_logAddWarn(
+        tr_logAddError(
             fmt::format(
                 fmt::runtime(_("Couldn't truncate '{path}': {error} ({error_code})")),
                 fmt::arg("path", filename),
                 fmt::arg("error", error.message()),
                 fmt::arg("error_code", error.code())));
         tr_sys_file_close(fd);
+        if (out_error != nullptr)
+        {
+            *out_error = std::move(error);
+        }
         return {};
     }
 
