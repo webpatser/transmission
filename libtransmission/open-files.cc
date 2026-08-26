@@ -249,7 +249,7 @@ std::optional<tr_sys_file_t> tr_open_files::get(
     // https://bugs.launchpad.net/ubuntu/+source/transmission/+bug/318249
     if (resize_needed && !tr_sys_file_truncate(fd, file_size, &error))
     {
-        tr_logAddWarn(
+        tr_logAddError(
             fmt::format(
                 fmt::runtime(_("Couldn't truncate '{path}': {error} ({error_code})")),
                 fmt::arg("path", filename),

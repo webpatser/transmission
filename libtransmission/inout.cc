@@ -114,7 +114,15 @@ bool write_entire_buf(tr_sys_file_t const fd, uint64_t file_offset, std::span<ui
         }
     }
 
-    if (!error) // the file doesn't exist, and we can't create it
+    if (error)
+    {
+        // open_files.get() reports why but not which file; the message
+        // reaches the user via the torrent's local error, so put the
+        // filename back in
+        error.prefix_message(
+            fmt::format(fmt::runtime(_("Couldn't get '{path}': ")), fmt::arg("path", tor.file_subpath(file_index))));
+    }
+    else // the file doesn't exist, and we can't create it
     {
         error.set(
             ENOENT,
@@ -148,11 +156,8 @@ void read_bytes(
     auto const fd = get_fd(session, open_files, tor, false, file_index, error);
     if (!fd || error)
     {
-        if (error)
-        {
-            // get_fd()'s error message is already fully formatted
-            tr_logAddErrorTor(&tor, std::string{ error.message() });
-        }
+        // no logging needed here: open_files.get() has already logged
+        // the failure
         return;
     }
 
@@ -191,12 +196,9 @@ void write_bytes(
     auto const fd = get_fd(session, open_files, tor, true, file_index, error);
     if (!fd || error)
     {
-        if (error)
-        {
-            // get_fd()'s error message is already fully formatted;
-            // the caller also surfaces it via the torrent's local error
-            tr_logAddErrorTor(&tor, std::string{ error.message() });
-        }
+        // no logging needed here: open_files.get() has already logged
+        // the failure, and the caller also surfaces `error` via the
+        // torrent's local error
         return;
     }
 
