@@ -144,7 +144,7 @@ std::optional<tr_sys_file_t> tr_open_files::get(
     std::string_view filename_in,
     Preallocation allocation,
     uint64_t file_size,
-    tr_error* out_error)
+    tr_error& error)
 {
     // is there already an entry
     auto key = make_key(tor_id, file_num);
@@ -160,7 +160,6 @@ std::optional<tr_sys_file_t> tr_open_files::get(
 
     // create subfolders, if any
     auto const filename = tr_pathbuf{ filename_in };
-    auto error = tr_error{};
     if (writable)
     {
         auto dir = tr_pathbuf{ filename.sv() };
@@ -173,10 +172,6 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                     fmt::arg("path", dir),
                     fmt::arg("error", error.message()),
                     fmt::arg("error_code", error.code())));
-            if (out_error != nullptr)
-            {
-                *out_error = std::move(error);
-            }
             return {};
         }
     }
@@ -200,10 +195,6 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                 fmt::arg("path", filename),
                 fmt::arg("error", error.message()),
                 fmt::arg("error_code", error.code())));
-        if (out_error != nullptr)
-        {
-            *out_error = std::move(error);
-        }
         return {};
     }
 
@@ -234,10 +225,6 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                     fmt::arg("error", error.message()),
                     fmt::arg("error_code", error.code())));
             tr_sys_file_close(fd);
-            if (out_error != nullptr)
-            {
-                *out_error = std::move(error);
-            }
             return {};
         }
 
@@ -258,10 +245,6 @@ std::optional<tr_sys_file_t> tr_open_files::get(
                 fmt::arg("error", error.message()),
                 fmt::arg("error_code", error.code())));
         tr_sys_file_close(fd);
-        if (out_error != nullptr)
-        {
-            *out_error = std::move(error);
-        }
         return {};
     }
 

@@ -40,7 +40,7 @@ public:
         std::string_view filename,
         Preallocation allocation,
         uint64_t file_size,
-        tr_error* out_error = nullptr);
+        tr_error& error);
 
     void close_all();
     void close_torrent(tr_torrent_id_t tor_id);
