@@ -49,7 +49,7 @@ TEST_F(InOutTest, writeFailsWhenExistingFileCannotBeOpened)
 
     auto err = int{};
     auto error_type = TR_STAT_OK;
-    auto const write_block = [session = session_, tor, &err, &error_type]()
+    auto const write_block = [tor, &err, &error_type]()
     {
         auto const buf = std::vector<uint8_t>(tr_block_info::BlockSize);
         err = tr_ioWrite(*tor, tor->block_loc(0U), std::size(buf), std::data(buf));
